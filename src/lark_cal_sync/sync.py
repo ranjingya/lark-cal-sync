@@ -66,9 +66,34 @@ class SyncService:
         return not self.errors
 
     async def run(self):
-        """功能：执行周期刷新。参数：self 为同步服务。返回值：任务取消后结束。"""
+        """功能：启动时立即刷新并执行后续调度。参数：self 为同步服务。返回值：任务取消后结束。"""
         async with httpx.AsyncClient(timeout=30) as transport:
             client = FeishuClient(self.settings, transport)
             while True:
                 await self.refresh(client)
-                await asyncio.sleep(self.settings.interval)
+                if not self.settings.sync_times:
+                    LOG.info("使用间隔同步，等待 %d 秒", self.settings.interval)
+                    await asyncio.sleep(self.settings.interval)
+                    continue
+                target = next_sync_time(datetime.now(timezone.utc), self.settings.sync_times, self.settings.timezone_name)
+                LOG.info("下次同步时间：%s", target.isoformat())
+                # 定期检查墙上时钟，使系统校时后仍按配置时刻触发。
+                while True:
+                    remaining = (target.astimezone(timezone.utc) - datetime.now(timezone.utc)).total_seconds()
+                    if remaining <= 0:
+                        break
+                    await asyncio.sleep(min(remaining, 60))
+
+
+def next_sync_time(now, sync_times, timezone_name):
+    """功能：计算下一次每日同步时间。参数：now 为带时区的当前时间，sync_times 为每日时间列表，timezone_name 为调度时区。返回值：严格晚于当前时刻的带时区时间。"""
+    if now.tzinfo is None or not sync_times:
+        raise ValueError("需要带时区的当前时间与非空同步时间列表")
+    zone = ZoneInfo(timezone_name)
+    today = now.astimezone(zone).date()
+    for offset in range(2):
+        candidates = [datetime.combine(today + timedelta(days=offset), value, zone) for value in sync_times]
+        future = [value for value in candidates if value.astimezone(timezone.utc) > now.astimezone(timezone.utc)]
+        if future:
+            return min(future, key=lambda value: value.astimezone(timezone.utc))
+    raise ValueError("无法计算下一次同步时间")

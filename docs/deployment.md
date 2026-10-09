@@ -72,7 +72,7 @@ docker compose up -d lark-cal-sync
 
 HTTPS 健康检查地址：`https://lark-cal.skills.kktree.cn/healthz`。
 
-订阅快照保存在命名卷中。服务每 1 小时读取飞书，手机自身的拉取间隔也会影响更新延迟。
+订阅快照保存在命名卷中。服务启动时立即读取飞书，并按服务器 `.env` 的 `SYNC_TIMES` 在每天 04:00 和 17:00（`Asia/Shanghai`）同步，手机自身的拉取间隔也会影响更新延迟。
 
 ## 小米日历
 
@@ -85,3 +85,18 @@ https://lark-cal.skills.kktree.cn/<FEED_TOKEN>/holidays.ics
 将 `<FEED_TOKEN>` 替换为服务器 `.env` 中的值。手机无需填写飞书应用凭证。
 
 订阅密钥位于 URL 中，持有完整地址的人可读取日历。服务关闭访问日志；Traefik 的访问日志也应关闭或隐藏订阅路径。支持按路由关闭访问日志的 Traefik 版本可设置 `traefik.http.routers.lark-cal-sync.observability.accesslogs=false`。更换 `FEED_TOKEN` 并重建容器可撤销已有订阅地址。
+
+## 容器内定时同步
+
+在服务器 `.env` 设置：
+
+```dotenv
+SYNC_TIMES=04:00,17:00
+CALENDAR_TIMEZONE=Asia/Shanghai
+```
+
+订阅服务常驻，同步任务在同一个容器内执行。支持任意逗号分隔的每日时间，格式为 `HH:MM`。配置变更后执行 `docker compose up -d --force-recreate lark-cal-sync`。
+
+容器启动时立即刷新一次，之后按每日时刻调度；停机期间错过的时刻由启动刷新补充。同步失败时保留已有快照，在下一次调度时再尝试。
+
+`SYNC_TIMES` 留空时使用 `SYNC_INTERVAL_SECONDS` 间隔模式。

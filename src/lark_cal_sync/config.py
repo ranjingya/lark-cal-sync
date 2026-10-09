@@ -3,6 +3,7 @@
 import os
 import re
 from dataclasses import dataclass
+from datetime import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -22,6 +23,7 @@ class Settings:
     past_days: int
     future_days: int
     timezone_name: str
+    sync_times: tuple[time, ...] = ()
 
     @classmethod
     def load(cls):
@@ -42,11 +44,21 @@ class Settings:
             int(os.getenv("SYNC_PAST_DAYS", "30")),
             int(os.getenv("SYNC_FUTURE_DAYS", "365")),
             os.getenv("CALENDAR_TIMEZONE", "Asia/Shanghai"),
+            load_sync_times(os.getenv("SYNC_TIMES", "")),
         )
         if settings.interval < 60 or settings.past_days < 0 or settings.future_days < 1:
             raise ValueError("刷新间隔至少 60 秒，历史天数非负，未来天数至少 1 天")
         ZoneInfo(settings.timezone_name)
         return settings
+
+    @property
+    def freshness_seconds(self):
+        """根据调度的最大间隔计算快照健康检查阈值。"""
+        if not self.sync_times:
+            return self.interval * 2
+        minutes = [value.hour * 60 + value.minute for value in self.sync_times]
+        gaps = [end - start for start, end in zip(minutes, minutes[1:] + [minutes[0] + 1440])]
+        return max(gaps) * 60 * 2
 
 
 def load_calendars(environment):
@@ -71,3 +83,16 @@ def load_calendars(environment):
         slugs.add(slug)
         sources.append({"calendar_id": fields["ID"], "name": fields["NAME"], "slug": slug})
     return sources
+
+
+def load_sync_times(raw):
+    """功能：解析每日同步时间。参数：raw 为逗号分隔的 HH:MM 字符串，空值使用间隔模式。返回值：排序去重的时间元组。"""
+    if not raw.strip():
+        return ()
+    values = []
+    for part in raw.split(","):
+        value = part.strip()
+        if not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value):
+            raise ValueError("SYNC_TIMES 需要使用逗号分隔的 HH:MM 格式")
+        values.append(time.fromisoformat(value))
+    return tuple(sorted(set(values)))

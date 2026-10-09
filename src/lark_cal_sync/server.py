@@ -40,7 +40,7 @@ def create_app(settings):
     @app.get("/healthz")
     async def health():
         """返回订阅就绪状态，不返回密钥与日历内容。"""
-        stale = any(datetime.now(timezone.utc) - updated > timedelta(seconds=settings.interval * 2) for updated in service.last_success.values())
+        stale = any(datetime.now(timezone.utc) - updated > timedelta(seconds=settings.freshness_seconds) for updated in service.last_success.values())
         ready = len(service.feeds) == len(service.sources) and len(service.last_success) == len(service.sources) and not service.errors and not stale
         return Response(json.dumps({"status": "ok" if ready else "degraded", "feeds": len(service.feeds)}), status_code=200 if ready else 503, media_type="application/json")
 
