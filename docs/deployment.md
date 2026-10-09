@@ -8,13 +8,14 @@
 
 ```text
 .env
+docker-compose.yaml
 ```
 
 - 手动维护：`.env`，填写飞书凭证、各日历的 ID、名称与订阅标识、随机订阅密钥和运行配置，文件权限设为 `600`。
-- GitHub Actions 通过 SSH 执行 `docker run`，容器名为 `lark-cal-sync`。
+- GitHub Actions 同步 `docker-compose.yaml` 并启动服务，容器名固定为 `lark-cal-sync`。
 - 运行时保存：`lark-cal-sync_calendar-data` 命名卷中的订阅快照。
 
-服务器需安装 Docker，并运行已连接 `traefik-network` 的 Traefik。域名 DNS 指向服务器，Traefik 配置 `websecure` 与 `myresolver`。域名、网络和证书解析器可通过 Actions Variables 中的 `CALENDAR_DOMAIN`、`TRAEFIK_NETWORK`、`TRAEFIK_ENTRYPOINT` 和 `TRAEFIK_CERTRESOLVER` 调整，未配置时使用上述默认值。
+服务器需安装 Docker 和 Docker Compose，并运行已连接 `traefik-network` 的 Traefik。域名 DNS 指向服务器，Traefik 配置 `websecure` 与 `myresolver`。域名、网络和证书解析器可通过服务器 `.env` 中的 `CALENDAR_DOMAIN`、`TRAEFIK_NETWORK`、`TRAEFIK_ENTRYPOINT` 和 `TRAEFIK_CERTRESOLVER` 调整。未配置时使用上述默认值。
 
 ## GitHub Actions 配置
 
@@ -40,7 +41,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-镜像地址为 `ghcr.io/ranjingya/lark-cal-sync`，具有 `latest` 和版本标签；手动构建使用 `manual-<提交短 ID>` 标签。服务器拉取 `latest`，通过 `docker run --name lark-cal-sync` 启动服务，使用 `.env` 注入应用配置，并通过容器标签配置 Traefik。
+镜像地址为 `ghcr.io/ranjingya/lark-cal-sync`，具有 `latest` 和版本标签；手动构建使用 `manual-<提交短 ID>` 标签。服务器拉取 `latest`，通过 `docker compose up -d` 启动服务，使用 `.env` 注入应用配置，并通过容器标签配置 Traefik。
 
 部署完成表示容器启动命令执行成功；健康状态需要通过下列运维命令确认。
 
@@ -49,10 +50,25 @@ git push origin v0.1.0
 在服务器部署目录执行：
 
 ```sh
-docker ps --filter name=lark-cal-sync
-docker logs --tail=100 lark-cal-sync
+docker compose ps
+docker compose logs --tail=100 lark-cal-sync
 docker inspect --format '{{.State.Health.Status}}' lark-cal-sync
 ```
+
+修改服务器 `.env` 后执行以下命令，即可重新加载配置：
+
+```sh
+docker compose up -d --force-recreate lark-cal-sync
+```
+
+拉取新镜像并更新服务：
+
+```sh
+docker compose pull lark-cal-sync
+docker compose up -d lark-cal-sync
+```
+
+日历配置和运行参数的修改可直接在服务器完成。
 
 HTTPS 健康检查地址：`https://lark-cal.skills.kktree.cn/healthz`。
 
