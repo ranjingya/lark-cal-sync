@@ -11,7 +11,7 @@
 docker-compose.yaml
 ```
 
-- 手动维护：`.env`，填写飞书凭证、日历源 JSON 数组、随机订阅密钥和运行配置，文件权限设为 `600`。
+- 手动维护：`.env`，填写飞书凭证、各日历的 ID、名称与订阅标识、随机订阅密钥和运行配置，文件权限设为 `600`。
 - GitHub Actions 同步：`docker-compose.yaml`。
 - 运行时保存：`calendar-data` 命名卷中的订阅快照。
 

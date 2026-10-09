@@ -27,7 +27,15 @@ uv run lark-cal-sync serve
 
 ## 日历源与配置
 
-通过 `.env` 中的 `FEISHU_CALENDARS` JSON 数组管理日历源，每项需要 `slug`、`name` 和 `calendar_id`。`slug` 唯一，由小写字母、数字和短横线组成。源配置变更后重启服务。
+在 `.env` 中逐项填写日历配置：
+
+```dotenv
+FEISHU_CALENDAR_1_ID=填写开放API日历ID
+FEISHU_CALENDAR_1_NAME=日历名称
+FEISHU_CALENDAR_1_SLUG=holidays
+```
+
+多个日历分别使用编号 `1`、`2`、`3` 等。每个日历的 `SLUG` 唯一，由小写字母、数字和短横线组成，对应订阅地址中的文件名。配置变更后重启服务。
 
 | 环境变量 | 默认值 | 作用 |
 | --- | --- | --- |
@@ -35,7 +43,9 @@ uv run lark-cal-sync serve
 | `SYNC_PAST_DAYS` | `30` | 历史同步天数 |
 | `SYNC_FUTURE_DAYS` | `365` | 未来同步天数 |
 | `CALENDAR_TIMEZONE` | `Asia/Shanghai` | 日期范围计算时区 |
-| `FEISHU_CALENDARS` | 必填 | 日历源 JSON 数组 |
+| `FEISHU_CALENDAR_<编号>_ID` | 必填 | 飞书日历 ID |
+| `FEISHU_CALENDAR_<编号>_NAME` | 必填 | 日历显示名称 |
+| `FEISHU_CALENDAR_<编号>_SLUG` | 必填 | 订阅文件标识 |
 | `DATA_DIR` | `data` | 快照目录 |
 
 服务按 30 天窗口读取展开的日程实例，包含重复日程和例外调整。ICS 使用稳定 UID，全天日程保持日期语义，定时日程使用 UTC 时间。每轮成功后整体替换快照，原日程的修改和取消随客户端重新读取生效。快照只包含配置范围内的日程。
