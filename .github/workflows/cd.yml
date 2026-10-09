@@ -70,36 +70,56 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Copy deployment files to server
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PRIVATE_KEY_PASSPHRASE }}
-          source: "docker-compose.yaml"
-          target: ${{ vars.DEPLOY_DIR }}
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
         env:
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/lark-cal-sync:latest
+          CALENDAR_DOMAIN: ${{ vars.CALENDAR_DOMAIN || 'lark-cal.skills.kktree.cn' }}
+          TRAEFIK_NETWORK: ${{ vars.TRAEFIK_NETWORK || 'traefik-network' }}
+          TRAEFIK_ENTRYPOINT: ${{ vars.TRAEFIK_ENTRYPOINT || 'websecure' }}
+          TRAEFIK_CERTRESOLVER: ${{ vars.TRAEFIK_CERTRESOLVER || 'myresolver' }}
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PRIVATE_KEY_PASSPHRASE }}
-          envs: GHCR_USERNAME,GHCR_TOKEN
+          envs: GHCR_USERNAME,GHCR_TOKEN,DEPLOY_DIR,IMAGE,CALENDAR_DOMAIN,TRAEFIK_NETWORK,TRAEFIK_ENTRYPOINT,TRAEFIK_CERTRESOLVER
           script: |
             set -e
             deploy_docker_config=$(mktemp -d)
             export DOCKER_CONFIG="$deploy_docker_config"
             trap 'rm -rf -- "$deploy_docker_config"' EXIT
             echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
-            cd "${{ vars.DEPLOY_DIR }}"
-            docker compose pull lark-cal-sync
-            docker compose up -d --remove-orphans lark-cal-sync
+            cd "$DEPLOY_DIR"
+            test -s .env
+            docker network inspect "$TRAEFIK_NETWORK" >/dev/null
+            docker pull "$IMAGE"
+            # 订阅快照持久化到命名数据卷。
+            docker volume create lark-cal-sync_calendar-data >/dev/null
+            for container in lark-cal-sync lark-cal-sync-lark-cal-sync-1; do
+              if docker container inspect "$container" >/dev/null 2>&1; then
+                docker rm -f "$container"
+              fi
+            done
+            docker run -d \
+              --name lark-cal-sync \
+              --restart unless-stopped \
+              --env-file .env \
+              --network "$TRAEFIK_NETWORK" \
+              --volume lark-cal-sync_calendar-data:/app/data \
+              --log-opt max-size=10m \
+              --log-opt max-file=3 \
+              --label traefik.enable=true \
+              --label "traefik.docker.network=$TRAEFIK_NETWORK" \
+              --label "traefik.http.routers.lark-cal-sync.rule=Host(\`$CALENDAR_DOMAIN\`)" \
+              --label "traefik.http.routers.lark-cal-sync.entrypoints=$TRAEFIK_ENTRYPOINT" \
+              --label traefik.http.routers.lark-cal-sync.tls=true \
+              --label "traefik.http.routers.lark-cal-sync.tls.certresolver=$TRAEFIK_CERTRESOLVER" \
+              --label traefik.http.routers.lark-cal-sync.service=lark-cal-sync \
+              --label traefik.http.services.lark-cal-sync.loadbalancer.server.port=8000 \
+              "$IMAGE"
             docker image prune -f
