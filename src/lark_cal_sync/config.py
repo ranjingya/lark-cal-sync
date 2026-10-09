@@ -38,7 +38,7 @@ class Settings:
             os.environ["FEISHU_APP_ID"], os.environ["FEISHU_APP_SECRET"], token,
             load_calendars(os.environ),
             Path(os.getenv("DATA_DIR", "data")),
-            int(os.getenv("SYNC_INTERVAL_SECONDS", "1800")),
+            int(os.getenv("SYNC_INTERVAL_SECONDS", "3600")),
             int(os.getenv("SYNC_PAST_DAYS", "30")),
             int(os.getenv("SYNC_FUTURE_DAYS", "365")),
             os.getenv("CALENDAR_TIMEZONE", "Asia/Shanghai"),

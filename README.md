@@ -2,7 +2,7 @@
 
 使用 uv 和 Python 将飞书日历发布为 ICS 订阅，供小米等支持 URL 订阅的日历客户端读取。
 
-服务每 30 分钟刷新一次，并持久化最后一次成功的快照。项目当前配置的日历源为 KK 假期。
+服务每 1 小时刷新一次，并持久化最后一次成功的快照。项目当前配置的日历源为 KK 假期。
 
 ## 本地运行
 
@@ -39,7 +39,7 @@ FEISHU_CALENDAR_1_SLUG=holidays
 
 | 环境变量 | 默认值 | 作用 |
 | --- | --- | --- |
-| `SYNC_INTERVAL_SECONDS` | `1800` | 刷新间隔，至少 60 秒 |
+| `SYNC_INTERVAL_SECONDS` | `3600` | 刷新间隔，至少 60 秒 |
 | `SYNC_PAST_DAYS` | `30` | 历史同步天数 |
 | `SYNC_FUTURE_DAYS` | `365` | 未来同步天数 |
 | `CALENDAR_TIMEZONE` | `Asia/Shanghai` | 日期范围计算时区 |

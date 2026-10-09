@@ -56,7 +56,7 @@ docker inspect --format '{{.State.Health.Status}}' lark-cal-sync
 
 HTTPS 健康检查地址：`https://lark-cal.skills.kktree.cn/healthz`。
 
-订阅快照保存在命名卷中。服务每 30 分钟读取飞书，手机自身的拉取间隔也会影响更新延迟。
+订阅快照保存在命名卷中。服务每 1 小时读取飞书，手机自身的拉取间隔也会影响更新延迟。
 
 ## 小米日历
 
